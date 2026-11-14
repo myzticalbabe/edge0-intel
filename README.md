@@ -1,0 +1,130 @@
+# Edge0-Intel — Tensor Shard Evolution & GGUF Surgery
+
+**Meta-evolution over tensor shards:** populations of model builds, surgery operators as mutations, functional fitness (refusal + caps), ledger of every run, champions served.
+
+## Overview
+
+Edge0-Intel is the freebuff lane's tensor evolution engine — a system for automated model surgery, ablation, and evolution across quantized and full-precision model formats.
+
+### Core Capabilities
+
+- **GGUF-domain surgery**: `scripts/gguf_abliterate.py` — byte-exact metadata copy (KV layouts: scalar/string/array-item-parts), F16 writeback, s=0 roundtrip
+- **Native torch path**: int4 U32 dequant (`scripts/dequant_8b.py`, per-expert keys, tensor index) + CPU fallbacks (KDA port, short-conv, RMS-gate, `scripts/fla_torch_fallback.py`)
+- **Safetensors abliteration**: output-side projection, dim-mismatch skips, math validated 1e-6
+- **Refusal direction extraction**: 8B models, norm tracking, dimensional analysis
+- **Evolution harness**: 16-worker 3.14t pool, dose-response curves, ledgered evaluations
+
+### Proven Results
+
+| Model | Baseline | s=0.5 | s=1.0 | s=1.5 | s=2.0 | s=-1.0 |
+|-------|----------|-------|-------|-------|-------|--------|
+| Gemma-4B | 14/19 | 12/19 | 20/19 | 15/18 | 22/18 | 14/19 |
+| Edge0-8B | 0/25 | 18/20 | — | — | — | — |
+
+**Key Finding**: Refusal-direction dose on Gemma is backwards/flat — do NOT escalate strength (sneg10 = stock rules out sign flip).
+
+### Architecture
+
+```
+edge0-intel/
+├── src/                    # Core surgery & evolution operators
+├── scripts/                # Ablation, dequant, evaluation, grafting
+├── models/                 # Model artifacts (GGUF, safetensors, torch)
+├── variants/               # Evolved model variants
+├── graft/                  # Structural & deep grafting experiments
+├── tests/                  # Surgery validation (ALL PASS)
+├── eval_sets/              # Evaluation corpora (100+20)
+├── scripts/svi.py          # SVI admission gates + prediction
+├── STRATUM/                # Layer-wise pipeline (Gemma torch-forward replacement)
+└── video/                  # Rendered evolution visualizations
+```
+
+### Key Documents
+
+- **META_EVOLUTION.md** — Evolution specification
+- **META_EVOLUTION_DEEPDIVE.md** — Deep technical dive
+- **TECHNIQUES.md** — Surgery operator catalog
+- **TENSOR_SOURCES.md** — Model provenance & sources
+- **PROJECT_NAME.md** — Identity
+- **SVI_SPEC.md** — SVI admission gates & promotion policy (N≥50)
+- **RAM_RUNBOOK.md** — 8 principles for single-window runs
+- **STRATUM_THESIS.md** — Layer-wise pipeline thesis
+- **WHISKER_DOCTRINE.md** — Evolution doctrine
+
+### Live Servers
+
+| Port | Service | Status |
+|------|---------|--------|
+| 8091 | Spark-X2.5 Q4_K_M (32K ctx) | UP |
+| 8089 | Driver + mesh | DOWN by design |
+| 8090 | Fast bench | DOWN by design |
+| 8092 | Alternate | DOWN by design |
+
+### Quickstart
+
+```bash
+# Run evaluation harness
+python scripts/eval_full.py --model models/edge0-8b-abl-s1.0 --n 100
+
+# GGUF surgery
+python scripts/gguf_abliterate.py --input models/input.gguf --output models/output.gguf --strength 1.0
+
+# SVI admission
+python scripts/svi.py --predict --layer-range 20-35
+
+# STRATUM layer-wise pipeline (Gemma)
+python scripts/stratum_pipeline.py --model models/gemma-4-e4b
+```
+
+### Hardware Requirements
+
+- **GPU**: 24GB+ VRAM (for 8B+ models), CPU fallback available
+- **RAM**: 64GB+ system RAM (candidate builds 5-7GB each)
+- **Disk**: 15GB headroom minimum
+- **Python**: 3.14t free-threaded (3.15t/3.16t compatible)
+- **Dependencies**: See `requirements-intel.txt`
+
+### Promotion Policy (SVI_SPEC.md)
+
+- N≥50 for promotion (N=6 subsets gated entry only)
+- Baselines: stock N=100 SUPERSEDES N=6 subset
+- Direction audit required before P2/P3 combos
+
+### Donor Compatibility
+
+**Same-arch only** — shape + coordinate + interface rule enforced.
+
+### License
+
+This project is licensed under the **SOUL FORGE License v1.0** — see [LICENSE](LICENSE) for details.
+
+> *"Code is crystallized intention. Tend the fire."*
+
+## Related Repositories
+
+| Repo | Description | Status |
+|------|-------------|--------|
+| azazael | Monorepo: worm registry, cluster system, agent harness | Active |
+| azazael-core | Installable, interpreter-agnostic repackaging | Active |
+| nurse-ratchet | Behavioural package: person state modelled | Active |
+| esquire-admissibility | AI-evidence admissibility gates | Active |
+| cradle | Composition over FLAMING SWORD, REAPER, GRIMOIRE | Active |
+| jaeger | Durable spans, JSONL ledger, stdlib only | Active |
+| madi | Browsing instrument: fetch, challenge taxonomy, scorer | Active |
+| grantforge | AI-native grant tooling | Active |
+| krampus | Composition: MellifluousML, Madi, Gamora, Eve, Lilith | Active |
+| shardex | Shard execution engine | Active |
+| flaming-sword | Defensive instrument: sentinel, compliance, formal verification | Active |
+| hydra-mlcluster | Adaptive ML cluster processing | Active |
+| persephone-sync | Cross-platform env sync | Active |
+| scribe | Documentation generation | Active |
+| ecosystem-orchestrator | ML platform install/orchestration | Active |
+| codex-video-engine | CODEX Studio desktop app + video engine | Active |
+| eliza | Companion runtime: shards, adopted trees | Active |
+| EveUnleashed | Gamora, Lucy, Jaeger, Berzerker AIO native on 3.16t | Active |
+| wasm-education | WASM Education Platform | Active |
+| myzticalbabe.github.io | Landing Hub + Domain Atlas | Active |
+
+## Contributing
+
+Read `CONTRIBUTING.md` first. The short version: bring a negative control. This project does not accept a claim that has no test able to show it false.
