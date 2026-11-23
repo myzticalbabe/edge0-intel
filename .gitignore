@@ -1,0 +1,22 @@
+# ShardFoundry local-execution hygiene (scoped to edge0-intel/).
+# Prevents multi-GB accidents; ledger + scripts + docs stay tracked.
+*.gguf
+*.safetensors
+*.npy
+*.log
+*.err
+offload_*/
+graft/
+graft_probe/
+__pycache__/
+tmp_surg/
+.ignore
+*.out
+*.log
+*.err
+meta_tensors.txt
+parts*.txt
+sweep_status.json
+models/*.gguf
+!models/*/README.md
+_upstream/

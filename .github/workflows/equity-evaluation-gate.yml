@@ -1,0 +1,141 @@
+# Equity Evaluation Gate Workflow
+# Enforces structured bias interruption and equity tracking per RULE 0Z-R
+
+name: Equity Evaluation Gate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+    inputs:
+      evaluation_type:
+        description: "Type of evaluation"
+        type: choice
+        options: [annual, promotion, compensation, manual]
+        required: true
+        default: "manual"
+      candidate_demographics:
+        description: "Candidate demographic context (voluntary)"
+        type: string
+        required: false
+        default: "not-provided"
+
+permissions:
+  contents: read
+  pull-requests: write
+  statuses: write
+
+env:
+  BIAS_INTERRUPTER: "required"
+  EVALUATORS: "panel-min-3"
+  PERFORMANCE_RATING: "structured-rubric"
+  POTENTIAL_RATING: "evidence-based"
+  SKILL_RATING: "demonstrated"
+  PERSONALITY_RATING: "excluded"
+  SPONSOR: ""
+
+jobs:
+  equity-check:
+    name: Equity Evaluation Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify bias interrupter configured
+        run: |
+          if [ -z "$BIAS_INTERRUPTER" ] || [ "$BIAS_INTERRUPTER" != "required" ]; then
+            echo "::error::BIAS_INTERRUPTER must be set to 'required' per RULE 0Z-R"
+            exit 1
+          fi
+          echo "Bias interrupter: REQUIRED"
+
+      - name: Verify evaluator panel size
+        run: |
+          if [ -z "$EVALUATORS" ] || [ "$EVALUATORS" != "panel-min-3" ]; then
+            echo "::error::EVALUATORS must be 'panel-min-3' minimum per RULE 0Z-R Tier 1"
+            exit 1
+          fi
+          echo "Evaluator panel: MINIMUM 3"
+
+      - name: Verify structured rubrics for performance/potential
+        run: |
+          if [ -z "$PERFORMANCE_RATING" ] || [ "$PERFORMANCE_RATING" != "structured-rubric" ]; then
+            echo "::error::PERFORMANCE_RATING must use structured rubric"
+            exit 1
+          fi
+          if [ -z "$POTENTIAL_RATING" ] || [ "$POTENTIAL_RATING" != "evidence-based" ]; then
+            echo "::error::POTENTIAL_RATING must be evidence-based"
+            exit 1
+          fi
+          echo "Performance rubric: STRUCTURED"
+          echo "Potential rating: EVIDENCE-BASED"
+
+      - name: Verify skills rated separately from personality
+        run: |
+          if [ -z "$SKILL_RATING" ] || [ "$SKILL_RATING" != "demonstrated" ]; then
+            echo "::error::SKILL_RATING must be 'demonstrated' (skills separate from personality)"
+            exit 1
+          fi
+          if [ -z "$PERSONALITY_RATING" ] || [ "$PERSONALITY_RATING" != "excluded" ]; then
+            echo "::error::PERSONALITY_RATING must be 'excluded' (personality not rated)"
+            exit 1
+          fi
+          echo "Skills rated: DEMONSTRATED"
+          echo "Personality rated: EXCLUDED"
+
+      - name: Verify data tracking active
+        run: |
+          if [ ! -f "equity_tracking.json" ]; then
+            echo "::warning::Equity tracking file not found - creating template"
+            python -c "import json, os; data={'evaluation_cycle':'${{ github.event.inputs.evaluation_type || \"manual\" }}','candidate_demographics':'${{ github.event.inputs.candidate_demographics || \"not-provided\" }}','bias_interrupter':os.environ.get('BIAS_INTERRUPTER',''),'evaluators':os.environ.get('EVALUATORS',''),'performance_rating':os.environ.get('PERFORMANCE_RATING',''),'potential_rating':os.environ.get('POTENTIAL_RATING',''),'skill_rating':os.environ.get('SKILL_RATING',''),'personality_rating':os.environ.get('PERSONALITY_RATING',''),'timestamp':'$(date -u +%Y-%m-%dT%H:%M:%SZ)'}; open('equity_tracking.json','w').write(json.dumps(data,indent=2))"
+          fi
+          echo "Equity tracking recorded"
+
+      - name: Verify sponsorship for advancement
+        if: github.event.inputs.evaluation_type == 'promotion'
+        run: |
+          if [ -z "$SPONSOR" ]; then
+            echo "::error::Formal sponsorship required for promotion (not mentoring) - blocked per RULE 0Z-R Tier 2"
+            exit 1
+          fi
+          echo "Sponsor: $SPONSOR"
+
+      - name: Verify service work accounting
+        run: |
+          if [ -z "$SERVICE_WORK" ]; then
+            echo "::warning::SERVICE_WORK not set - service contributions may be invisible"
+          else
+            echo "Service work tracked: $SERVICE_WORK"
+          fi
+
+      - name: Comment on PR with equity status
+        if: github.event_name == 'pull_request' && always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            let output = 'Equity gate checks completed';
+            if (fs.existsSync('equity_tracking.json')) {
+              output = fs.readFileSync('equity_tracking.json', 'utf8');
+            }
+            const body = '## Equity Evaluation Gate\n\n' +
+              '\`\`\`json\n' + output.slice(0, 2000) + '\n\`\`\`\n\n' +
+              '*RULE 0Z-R compliance check*';
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            });
+
+      - name: Fail workflow on equity violations
+        if: failure()
+        run: |
+          echo "Equity evaluation gate FAILED - see PR comment for details"
+          exit 1
